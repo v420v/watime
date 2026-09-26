@@ -15,6 +15,7 @@
   ;;   0x1000  type table: 256 entries (0x1000..0x1fff)
   ;;   0x2000  func table: 1024 entries (0x2000..0x5fff)
   ;;   0x6000  export table: 256 entries (0x6000..0x6fff)
+  ;;   0x8000  value stack: 8-byte slots, grows up (0x8000..0xffff)
 
   (data (i32.const 0x100) "error: ")                ;; 7 bytes  (0x100..0x106)
   (data (i32.const 0x107) "\n")                     ;; 1 byte   (0x107)
@@ -45,6 +46,10 @@
   (data (i32.const 0x213) ", locals ")              ;; 9 bytes  (0x213..0x21b)
   (data (i32.const 0x21c) ", body ")                ;; 7 bytes  (0x21c..0x222)
   (data (i32.const 0x223) "..")                     ;; 2 bytes  (0x223..0x224)
+  (data (i32.const 0x225) "0123456789abcdef")       ;; 16 bytes (0x225..0x234)
+  (data (i32.const 0x235) "error: unimplemented opcode 0x")  ;; 30 bytes (0x235..0x252)
+  (data (i32.const 0x253) "stack overflow")         ;; 14 bytes (0x253..0x260)
+  (data (i32.const 0x261) "stack underflow")        ;; 15 bytes (0x261..0x26f)
   (data (i32.const 0x400)
     "\25\00\00\00" ;; length
     ;; (module (func (export "main") (result i32) i32.const 42))
@@ -58,6 +63,43 @@
   (global $type_count (mut i32) (i32.const 0))
   (global $func_count (mut i32) (i32.const 0))
   (global $export_count (mut i32) (i32.const 0))
+  (global $sp (mut i32) (i32.const 0x8000))
+
+  (type $op (func (result i32)))
+  (table $ops 256 funcref)
+  (elem (i32.const 0)
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
+    $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl)
 
   ;; write len bytes from ptr to fd
   (func $print_str (param $fd i32) (param $ptr i32) (param $len i32)
@@ -83,6 +125,28 @@
       (local.set $n (i32.div_u (local.get $n) (i32.const 10)))
       (br_if $next (local.get $n)))
     (call $print_str (local.get $fd) (local.get $p) (i32.sub (i32.const 0x1a) (local.get $p))))
+
+  ;; print the low byte of n as two hex digits
+  (func $print_hex8 (param $fd i32) (param $n i32)
+    (i32.store8 (i32.const 0x10)
+      (i32.load8_u (i32.add (i32.const 0x225) (i32.and (i32.shr_u (local.get $n) (i32.const 4)) (i32.const 0xf)))))
+    (i32.store8 (i32.const 0x11)
+      (i32.load8_u (i32.add (i32.const 0x225) (i32.and (local.get $n) (i32.const 0xf)))))
+    (call $print_str (local.get $fd) (i32.const 0x10) (i32.const 2)))
+
+  ;; push an i32 onto the value stack
+  (func $push_i32 (param $v i32)
+    (if (i32.ge_u (global.get $sp) (i32.const 0x10000))
+      (then (call $print_err (i32.const 0x253) (i32.const 14))))
+    (i32.store (global.get $sp) (local.get $v))
+    (global.set $sp (i32.add (global.get $sp) (i32.const 8))))
+
+  ;; pop an i32 from the vakue stack
+  (func $pop_i32 (result i32)
+    (if (i32.le_u (global.get $sp) (i32.const 0x8000))
+      (then (call $print_err (i32.const 0x261) (i32.const 15))))
+    (global.set $sp (i32.sub (global.get $sp) (i32.const 8)))
+    (i32.load (global.get $sp)))
 
   ;; returns 1 if the len bytes at a and b are equal
   (func $memeq (param $a i32) (param $b i32) (param $len i32) (result i32)
@@ -309,6 +373,19 @@
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $next))))
 
+  ;; print error `op not implemented yet` and exit
+  (func $op_unimpl (result i32)
+    (call $print_str (i32.const 2) (i32.const 0x235) (i32.const 30))
+    (call $print_hex8 (i32.const 2) (i32.load8_u (i32.sub (global.get $pos) (i32.const 1))))
+    (call $print_str (i32.const 2) (i32.const 0x107) (i32.const 1))
+    (call $proc_exit (i32.const 1))
+    unreachable)
+
+  ;; run instructions from $pos
+  (func $exec_run
+    (loop $next
+      (br_if $next (i32.eqz (call_indirect (type $op) (call $read_u8))))))
+
   (func (export "_start")
     (local $end i32)
     (local $id i32)
@@ -364,5 +441,8 @@
     (call $print_str (i32.const 1) (i32.const 0x199) (i32.const 4))
     (call $print_str (i32.const 1) (i32.const 0x19d) (i32.const 5))
     (call $print_u32 (i32.const 1) (local.get $main))
-    (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1)))
+    (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
+    ;; run main
+    (global.set $pos (i32.load offset=8 (call $get_func_entry (local.get $main))))
+    (call $exec_run))
 )
