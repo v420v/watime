@@ -100,6 +100,8 @@
     $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
     $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl
     $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl $op_unimpl)
+  (elem (i32.const 0x0b) $op_end)
+  (elem (i32.const 0x41) $op_i32_const)
 
   ;; write len bytes from ptr to fd
   (func $print_str (param $fd i32) (param $ptr i32) (param $len i32)
@@ -183,6 +185,21 @@
         (i32.shl (i32.and (local.get $b) (i32.const 0x7f)) (local.get $shift))))
       (local.set $shift (i32.add (local.get $shift) (i32.const 7)))
       (br_if $next (i32.and (local.get $b) (i32.const 0x80))))
+    (local.get $result))
+
+  ;; read signed LEB128
+  (func $read_s32 (result i32)
+    (local $result i32) (local $shift i32) (local $b i32)
+    (loop $next
+      (local.set $b (call $read_u8))
+      (local.set $result (i32.or (local.get $result)
+        (i32.shl (i32.and (local.get $b) (i32.const 0x7f)) (local.get $shift))))
+      (local.set $shift (i32.add (local.get $shift) (i32.const 7)))
+      (br_if $next (i32.and (local.get $b) (i32.const 0x80))))
+    (if (i32.and (i32.lt_u (local.get $shift) (i32.const 32))
+                 (i32.ne (i32.and (local.get $b) (i32.const 0x40)) (i32.const 0)))
+      (then (local.set $result
+        (i32.or (local.get $result) (i32.shl (i32.const -1) (local.get $shift))))))
     (local.get $result))
 
   ;; returns the address of type table entry i
@@ -381,6 +398,15 @@
     (call $proc_exit (i32.const 1))
     unreachable)
 
+  ;; 0x0b end
+  (func $op_end (result i32)
+    (i32.const 1))
+
+  ;; 0x41 i32.const push signed LEB128 immediate
+  (func $op_i32_const (result i32)
+    (call $push_i32 (call $read_s32))
+    (i32.const 0))
+
   ;; run instructions from $pos
   (func $exec_run
     (loop $next
@@ -444,5 +470,8 @@
     (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
     ;; run main
     (global.set $pos (i32.load offset=8 (call $get_func_entry (local.get $main))))
-    (call $exec_run))
+    (call $exec_run)
+    ;; print the result on the value stack
+    (call $print_u32 (i32.const 1) (call $pop_i32))
+    (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1)))
 )
