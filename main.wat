@@ -412,12 +412,12 @@
     (loop $next
       (br_if $next (i32.eqz (call_indirect (type $op) (call $read_u8))))))
 
-  (func (export "_start")
+  ;; decode the embedded module
+  (func $decode_module
     (local $end i32)
     (local $id i32)
     (local $size i32)
     (local $start i32)
-    (local $main i32)
     (global.set $input_len (i32.load (i32.const 0x400)))
     (global.set $input_ptr (i32.const 0x404))
     (if (i32.lt_u (global.get $input_len) (i32.const 8))
@@ -457,7 +457,17 @@
           (call $print_err (i32.const 0x1a6) (i32.const 19)))
         (if (i32.ne (global.get $pos) (i32.add (local.get $start) (local.get $size)))
           (then (call $print_err (i32.const 0x17d) (i32.const 21))))
-        (br $continue)))
+        (br $continue))))
+
+  ;; run function funcidx on an empty value stack until it returns
+  (func $run_func (param $funcidx i32)
+    (global.set $sp (i32.const 0x8000))
+    (global.set $pos (i32.load offset=8 (call $get_func_entry (local.get $funcidx))))
+    (call $exec_run))
+
+  (func (export "_start")
+    (local $main i32)
+    (call $decode_module)
     (call $print_tables)
     ;; look up `main` and print function index
     (local.set $main (call $find_export (i32.const 0x1a2) (i32.const 4) (i32.const 0)))
@@ -468,10 +478,8 @@
     (call $print_str (i32.const 1) (i32.const 0x19d) (i32.const 5))
     (call $print_u32 (i32.const 1) (local.get $main))
     (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
-    ;; run main
-    (global.set $pos (i32.load offset=8 (call $get_func_entry (local.get $main))))
-    (call $exec_run)
-    ;; print the result on the value stack
+    ;; run main and print the result it left on the value stack
+    (call $run_func (local.get $main))
     (call $print_u32 (i32.const 1) (call $pop_i32))
     (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1)))
 )
