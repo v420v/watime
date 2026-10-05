@@ -10,7 +10,8 @@
   ;;   0x000   iovec for fd_write (ptr at 0x000, len at 0x004)
   ;;   0x008   nwritten
   ;;   0x010   digit buffer for $print_u32 (0x010..0x019)
-  ;;   0x100   string constants
+  ;;   0x100   text constants, used with $print_str (ptr, len)
+  ;;   0x200   error messages, NUL-terminated, used with $die (ptr)
   ;;   0x400   input module
   ;;   0x1000  type table: 256 entries (0x1000..0x1fff)
   ;;   0x2000  func table: 1024 entries (0x2000..0x5fff)
@@ -19,37 +20,39 @@
 
   (data (i32.const 0x100) "error: ")                ;; 7 bytes  (0x100..0x106)
   (data (i32.const 0x107) "\n")                     ;; 1 byte   (0x107)
-  (data (i32.const 0x108) "not a wasm module")      ;; 17 bytes (0x108..0x118)
-  (data (i32.const 0x119) "unexpected end")         ;; 14 bytes (0x119..0x126)
-  (data (i32.const 0x127) "bad section id")         ;; 14 bytes (0x127..0x134)
-  (data (i32.const 0x135) "ok\n")                   ;; 3 bytes  (0x135..0x137)
-  (data (i32.const 0x138) "section ")               ;; 8 bytes  (0x138..0x13f)
-  (data (i32.const 0x140) " size ")                 ;; 6 bytes  (0x140..0x145)
-  (data (i32.const 0x146) "table full")             ;; 10 bytes (0x146..0x14f)
-  (data (i32.const 0x150) "bad functype")           ;; 12 bytes (0x150..0x15b)
-  (data (i32.const 0x15c) "unsupported valtype")    ;; 19 bytes (0x15c..0x16e)
-  (data (i32.const 0x16f) "bad type index")         ;; 14 bytes (0x16f..0x17c)
-  (data (i32.const 0x17d) "section size mismatch")  ;; 21 bytes (0x17d..0x191)
-  (data (i32.const 0x192) "type ")                  ;; 5 bytes  (0x192..0x196)
-  (data (i32.const 0x197) ": ")                     ;; 2 bytes  (0x197..0x198)
-  (data (i32.const 0x199) " -> ")                   ;; 4 bytes  (0x199..0x19c)
-  (data (i32.const 0x19d) "func ")                  ;; 5 bytes  (0x19d..0x1a1)
-  (data (i32.const 0x1a2) "main")                   ;; 4 bytes  (0x1a2..0x1a5)
-  (data (i32.const 0x1a6) "unsupported section")    ;; 19 bytes (0x1a6..0x1b8)
-  (data (i32.const 0x1b9) "func count mismatch")    ;; 19 bytes (0x1b9..0x1cb)
-  (data (i32.const 0x1d0) "too many locals")        ;; 15 bytes (0x1d0..0x1de)
-  (data (i32.const 0x1df) "bad function body")      ;; 17 bytes (0x1df..0x1ef)
-  (data (i32.const 0x1f0) "export not found")       ;; 16 bytes (0x1f0..0x1ff)
-  (data (i32.const 0x200) "export ")                ;; 7 bytes  (0x200..0x206)
-  (data (i32.const 0x207) ": kind ")                ;; 7 bytes  (0x207..0x20d)
-  (data (i32.const 0x20e) " idx ")                  ;; 5 bytes  (0x20e..0x212)
-  (data (i32.const 0x213) ", locals ")              ;; 9 bytes  (0x213..0x21b)
-  (data (i32.const 0x21c) ", body ")                ;; 7 bytes  (0x21c..0x222)
-  (data (i32.const 0x223) "..")                     ;; 2 bytes  (0x223..0x224)
-  (data (i32.const 0x225) "0123456789abcdef")       ;; 16 bytes (0x225..0x234)
-  (data (i32.const 0x235) "error: unimplemented opcode 0x")  ;; 30 bytes (0x235..0x252)
-  (data (i32.const 0x253) "stack overflow")         ;; 14 bytes (0x253..0x260)
-  (data (i32.const 0x261) "stack underflow")        ;; 15 bytes (0x261..0x26f)
+  (data (i32.const 0x108) "ok\n")                   ;; 3 bytes  (0x108..0x10a)
+  (data (i32.const 0x10b) "section ")               ;; 8 bytes  (0x10b..0x112)
+  (data (i32.const 0x113) " size ")                 ;; 6 bytes  (0x113..0x118)
+  (data (i32.const 0x119) "type ")                  ;; 5 bytes  (0x119..0x11d)
+  (data (i32.const 0x11e) ": ")                     ;; 2 bytes  (0x11e..0x11f)
+  (data (i32.const 0x120) " -> ")                   ;; 4 bytes  (0x120..0x123)
+  (data (i32.const 0x124) "func ")                  ;; 5 bytes  (0x124..0x128)
+  (data (i32.const 0x129) "main")                   ;; 4 bytes  (0x129..0x12c)
+  (data (i32.const 0x12d) "export ")                ;; 7 bytes  (0x12d..0x133)
+  (data (i32.const 0x134) ": kind ")                ;; 7 bytes  (0x134..0x13a)
+  (data (i32.const 0x13b) " idx ")                  ;; 5 bytes  (0x13b..0x13f)
+  (data (i32.const 0x140) ", locals ")              ;; 9 bytes  (0x140..0x148)
+  (data (i32.const 0x149) ", body ")                ;; 7 bytes  (0x149..0x14f)
+  (data (i32.const 0x150) "..")                     ;; 2 bytes  (0x150..0x151)
+  (data (i32.const 0x152) "0123456789abcdef")       ;; 16 bytes (0x152..0x161)
+  (data (i32.const 0x162) "error: unimplemented opcode 0x")  ;; 30 bytes (0x162..0x17f)
+
+  (data (i32.const 0x200) "not a wasm module\00")      ;; 0x200..0x211
+  (data (i32.const 0x212) "unexpected end\00")         ;; 0x212..0x220
+  (data (i32.const 0x221) "bad section id\00")         ;; 0x221..0x22f
+  (data (i32.const 0x230) "unsupported section\00")    ;; 0x230..0x243
+  (data (i32.const 0x244) "section size mismatch\00")  ;; 0x244..0x259
+  (data (i32.const 0x25a) "table full\00")             ;; 0x25a..0x264
+  (data (i32.const 0x265) "bad functype\00")           ;; 0x265..0x271
+  (data (i32.const 0x272) "unsupported valtype\00")    ;; 0x272..0x285
+  (data (i32.const 0x286) "bad type index\00")         ;; 0x286..0x294
+  (data (i32.const 0x295) "func count mismatch\00")    ;; 0x295..0x2a8
+  (data (i32.const 0x2a9) "too many locals\00")        ;; 0x2a9..0x2b8
+  (data (i32.const 0x2b9) "bad function body\00")      ;; 0x2b9..0x2ca
+  (data (i32.const 0x2cb) "export not found\00")       ;; 0x2cb..0x2db
+  (data (i32.const 0x2dc) "stack overflow\00")         ;; 0x2dc..0x2ea
+  (data (i32.const 0x2eb) "stack underflow\00")        ;; 0x2eb..0x2fa
+
   (data (i32.const 0x400)
     "\25\00\00\00" ;; length
     ;; (module (func (export "main") (result i32) i32.const 42))
@@ -109,12 +112,24 @@
     (i32.store (i32.const 4) (local.get $len))
     (drop (call $fd_write (local.get $fd) (i32.const 0) (i32.const 1) (i32.const 8))))
 
-  ;; print "error: " + ptr message + "\n" to stderr and exit with code 1
-  (func $print_err (param $ptr i32) (param $len i32)
+  ;; returns the length of the NUL-terminated string at ptr
+  (func $strlen (param $ptr i32) (result i32)
+    (local $p i32)
+    (local.set $p (local.get $ptr))
+    (block $done
+      (loop $next
+        (br_if $done (i32.eqz (i32.load8_u (local.get $p))))
+        (local.set $p (i32.add (local.get $p) (i32.const 1)))
+        (br $next)))
+    (i32.sub (local.get $p) (local.get $ptr)))
+
+  ;; print "error: " + the NUL-terminated message + "\n" to stderr and exit with code 1
+  (func $die (param $msg i32)
     (call $print_str (i32.const 2) (i32.const 0x100) (i32.const 7))
-    (call $print_str (i32.const 2) (local.get $ptr) (local.get $len))
+    (call $print_str (i32.const 2) (local.get $msg) (call $strlen (local.get $msg)))
     (call $print_str (i32.const 2) (i32.const 0x107) (i32.const 1))
-    (call $proc_exit (i32.const 1)))
+    (call $proc_exit (i32.const 1))
+    unreachable)
 
   ;; print n in decimal
   (func $print_u32 (param $fd i32) (param $n i32)
@@ -131,22 +146,22 @@
   ;; print the low byte of n as two hex digits
   (func $print_hex8 (param $fd i32) (param $n i32)
     (i32.store8 (i32.const 0x10)
-      (i32.load8_u (i32.add (i32.const 0x225) (i32.and (i32.shr_u (local.get $n) (i32.const 4)) (i32.const 0xf)))))
+      (i32.load8_u (i32.add (i32.const 0x152) (i32.and (i32.shr_u (local.get $n) (i32.const 4)) (i32.const 0xf)))))
     (i32.store8 (i32.const 0x11)
-      (i32.load8_u (i32.add (i32.const 0x225) (i32.and (local.get $n) (i32.const 0xf)))))
+      (i32.load8_u (i32.add (i32.const 0x152) (i32.and (local.get $n) (i32.const 0xf)))))
     (call $print_str (local.get $fd) (i32.const 0x10) (i32.const 2)))
 
   ;; push an i32 onto the value stack
   (func $push_i32 (param $v i32)
     (if (i32.ge_u (global.get $sp) (i32.const 0x10000))
-      (then (call $print_err (i32.const 0x253) (i32.const 14))))
+      (then (call $die (i32.const 0x2dc))))  ;; "stack overflow"
     (i32.store (global.get $sp) (local.get $v))
     (global.set $sp (i32.add (global.get $sp) (i32.const 8))))
 
-  ;; pop an i32 from the vakue stack
+  ;; pop an i32 from the value stack
   (func $pop_i32 (result i32)
     (if (i32.le_u (global.get $sp) (i32.const 0x8000))
-      (then (call $print_err (i32.const 0x261) (i32.const 15))))
+      (then (call $die (i32.const 0x2eb))))  ;; "stack underflow"
     (global.set $sp (i32.sub (global.get $sp) (i32.const 8)))
     (i32.load (global.get $sp)))
 
@@ -171,7 +186,7 @@
   (func $read_u8 (result i32)
     (local $b i32)
     (if (i32.ge_u (global.get $pos) (i32.add (global.get $input_ptr) (global.get $input_len)))
-      (then (call $print_err (i32.const 0x119) (i32.const 14))))  ;; "unexpected end"
+      (then (call $die (i32.const 0x212))))  ;; "unexpected end"
     (local.set $b (i32.load8_u (global.get $pos)))
     (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
     (local.get $b))
@@ -223,7 +238,7 @@
         (local.set $t (call $read_u8))
         ;; only i32 (0x7f) and i64 (0x7e) are accepted
         (if (i32.and (i32.ne (local.get $t) (i32.const 0x7f)) (i32.ne (local.get $t) (i32.const 0x7e)))
-          (then (call $print_err (i32.const 0x15c) (i32.const 19))))
+          (then (call $die (i32.const 0x272))))  ;; "unsupported valtype"
         (local.set $n (i32.sub (local.get $n) (i32.const 1)))
         (br $next))))
 
@@ -232,13 +247,13 @@
     (local $i i32) (local $entry i32) (local $n i32)
     (global.set $type_count (call $read_u32))
     (if (i32.gt_u (global.get $type_count) (i32.const 256))
-      (then (call $print_err (i32.const 0x146) (i32.const 10))))
+      (then (call $die (i32.const 0x25a))))  ;; "table full"
     (block $done
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $type_count)))
         (local.set $entry (call $get_type_entry (local.get $i)))
         (if (i32.ne (call $read_u8) (i32.const 0x60))
-          (then (call $print_err (i32.const 0x150) (i32.const 12))))
+          (then (call $die (i32.const 0x265))))  ;; "bad functype"
         (local.set $n (call $read_u32))
         (i32.store (local.get $entry) (local.get $n))
         (i32.store offset=8 (local.get $entry) (global.get $pos))
@@ -255,13 +270,13 @@
     (local $i i32) (local $t i32)
     (global.set $func_count (call $read_u32))
     (if (i32.gt_u (global.get $func_count) (i32.const 1024))
-      (then (call $print_err (i32.const 0x146) (i32.const 10))))
+      (then (call $die (i32.const 0x25a))))  ;; "table full"
     (block $done
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $func_count)))
         (local.set $t (call $read_u32))
         (if (i32.ge_u (local.get $t) (global.get $type_count))
-          (then (call $print_err (i32.const 0x16f) (i32.const 14))))
+          (then (call $die (i32.const 0x286))))  ;; "bad type index"
         (i32.store (call $get_func_entry (local.get $i)) (local.get $t))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $next))))
@@ -271,14 +286,14 @@
     (local $i i32) (local $entry i32) (local $n i32)
     (global.set $export_count (call $read_u32))
     (if (i32.gt_u (global.get $export_count) (i32.const 256))
-      (then (call $print_err (i32.const 0x146) (i32.const 10))))
+      (then (call $die (i32.const 0x25a))))  ;; "table full"
     (block $done
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $export_count)))
         (local.set $entry (call $get_export_entry (local.get $i)))
         (local.set $n (call $read_u32))
         (if (i32.gt_u (local.get $n) (call $remaining))
-          (then (call $print_err (i32.const 0x119) (i32.const 14))))
+          (then (call $die (i32.const 0x212))))  ;; "unexpected end"
         (i32.store (local.get $entry) (global.get $pos))
         (i32.store offset=4 (local.get $entry) (local.get $n))
         (global.set $pos (i32.add (global.get $pos) (local.get $n)))
@@ -308,14 +323,14 @@
     (local $i i32) (local $entry i32) (local $size i32) (local $end i32)
     (local $ndecl i32) (local $n i32) (local $nlocals i32)
     (if (i32.ne (call $read_u32) (global.get $func_count))
-      (then (call $print_err (i32.const 0x1b9) (i32.const 19))))
+      (then (call $die (i32.const 0x295))))  ;; "func count mismatch"
     (block $done
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $func_count)))
         (local.set $entry (call $get_func_entry (local.get $i)))
         (local.set $size (call $read_u32))
         (if (i32.gt_u (local.get $size) (call $remaining))
-          (then (call $print_err (i32.const 0x119) (i32.const 14))))
+          (then (call $die (i32.const 0x212))))  ;; "unexpected end"
         (local.set $end (i32.add (global.get $pos) (local.get $size)))
         (local.set $nlocals (i32.const 0))
         (local.set $ndecl (call $read_u32))
@@ -325,7 +340,7 @@
             (local.set $n (call $read_u32))
             (call $read_valtypes (i32.const 1))
             (if (i32.gt_u (local.get $n) (i32.sub (i32.const 65536) (local.get $nlocals)))
-              (then (call $print_err (i32.const 0x1d0) (i32.const 15))))
+              (then (call $die (i32.const 0x2a9))))  ;; "too many locals"
             (local.set $nlocals (i32.add (local.get $nlocals) (local.get $n)))
             (local.set $ndecl (i32.sub (local.get $ndecl) (i32.const 1)))
             (br $decl)))
@@ -334,9 +349,9 @@
         (i32.store offset=12 (local.get $entry) (local.get $end))
         ;; the body must hold at least the final end opcode (0x0b)
         (if (i32.ge_u (global.get $pos) (local.get $end))
-          (then (call $print_err (i32.const 0x1df) (i32.const 17))))
+          (then (call $die (i32.const 0x2b9))))  ;; "bad function body"
         (if (i32.ne (i32.load8_u (i32.sub (local.get $end) (i32.const 1))) (i32.const 0x0b))
-          (then (call $print_err (i32.const 0x1df) (i32.const 17))))
+          (then (call $die (i32.const 0x2b9))))  ;; "bad function body"
         (global.set $pos (local.get $end))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $next))))
@@ -347,11 +362,11 @@
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $type_count)))
         (local.set $entry (call $get_type_entry (local.get $i)))
-        (call $print_str (i32.const 1) (i32.const 0x192) (i32.const 5))
+        (call $print_str (i32.const 1) (i32.const 0x119) (i32.const 5))
         (call $print_u32 (i32.const 1) (local.get $i))
-        (call $print_str (i32.const 1) (i32.const 0x197) (i32.const 2))
+        (call $print_str (i32.const 1) (i32.const 0x11e) (i32.const 2))
         (call $print_u32 (i32.const 1) (i32.load (local.get $entry)))
-        (call $print_str (i32.const 1) (i32.const 0x199) (i32.const 4))
+        (call $print_str (i32.const 1) (i32.const 0x120) (i32.const 4))
         (call $print_u32 (i32.const 1) (i32.load offset=4 (local.get $entry)))
         (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
@@ -361,16 +376,16 @@
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $func_count)))
         (local.set $entry (call $get_func_entry (local.get $i)))
-        (call $print_str (i32.const 1) (i32.const 0x19d) (i32.const 5))
+        (call $print_str (i32.const 1) (i32.const 0x124) (i32.const 5))
         (call $print_u32 (i32.const 1) (local.get $i))
-        (call $print_str (i32.const 1) (i32.const 0x197) (i32.const 2))
-        (call $print_str (i32.const 1) (i32.const 0x192) (i32.const 5))
+        (call $print_str (i32.const 1) (i32.const 0x11e) (i32.const 2))
+        (call $print_str (i32.const 1) (i32.const 0x119) (i32.const 5))
         (call $print_u32 (i32.const 1) (i32.load (local.get $entry)))
-        (call $print_str (i32.const 1) (i32.const 0x213) (i32.const 9))
+        (call $print_str (i32.const 1) (i32.const 0x140) (i32.const 9))
         (call $print_u32 (i32.const 1) (i32.load offset=4 (local.get $entry)))
-        (call $print_str (i32.const 1) (i32.const 0x21c) (i32.const 7))
+        (call $print_str (i32.const 1) (i32.const 0x149) (i32.const 7))
         (call $print_u32 (i32.const 1) (i32.sub (i32.load offset=8 (local.get $entry)) (global.get $input_ptr)))
-        (call $print_str (i32.const 1) (i32.const 0x223) (i32.const 2))
+        (call $print_str (i32.const 1) (i32.const 0x150) (i32.const 2))
         (call $print_u32 (i32.const 1) (i32.sub (i32.load offset=12 (local.get $entry)) (global.get $input_ptr)))
         (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
@@ -380,11 +395,11 @@
       (loop $next
         (br_if $done (i32.ge_u (local.get $i) (global.get $export_count)))
         (local.set $entry (call $get_export_entry (local.get $i)))
-        (call $print_str (i32.const 1) (i32.const 0x200) (i32.const 7))
+        (call $print_str (i32.const 1) (i32.const 0x12d) (i32.const 7))
         (call $print_str (i32.const 1) (i32.load (local.get $entry)) (i32.load offset=4 (local.get $entry)))
-        (call $print_str (i32.const 1) (i32.const 0x207) (i32.const 7))
+        (call $print_str (i32.const 1) (i32.const 0x134) (i32.const 7))
         (call $print_u32 (i32.const 1) (i32.load offset=8 (local.get $entry)))
-        (call $print_str (i32.const 1) (i32.const 0x20e) (i32.const 5))
+        (call $print_str (i32.const 1) (i32.const 0x13b) (i32.const 5))
         (call $print_u32 (i32.const 1) (i32.load offset=12 (local.get $entry)))
         (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
@@ -392,7 +407,7 @@
 
   ;; print error `op not implemented yet` and exit
   (func $op_unimpl (result i32)
-    (call $print_str (i32.const 2) (i32.const 0x235) (i32.const 30))
+    (call $print_str (i32.const 2) (i32.const 0x162) (i32.const 30))
     (call $print_hex8 (i32.const 2) (i32.load8_u (i32.sub (global.get $pos) (i32.const 1))))
     (call $print_str (i32.const 2) (i32.const 0x107) (i32.const 1))
     (call $proc_exit (i32.const 1))
@@ -421,13 +436,13 @@
     (global.set $input_len (i32.load (i32.const 0x400)))
     (global.set $input_ptr (i32.const 0x404))
     (if (i32.lt_u (global.get $input_len) (i32.const 8))
-      (then (call $print_err (i32.const 0x119) (i32.const 14))))
+      (then (call $die (i32.const 0x212))))  ;; "unexpected end"
     ;; throw a error if header is not 0x6d736100, or version not 1
     (if (i32.or
         (i32.ne (i32.load (global.get $input_ptr)) (i32.const 0x6d736100))
         (i32.ne (i32.load offset=4 (global.get $input_ptr)) (i32.const 1)))
-      (then (call $print_err (i32.const 0x108) (i32.const 17)))
-      (else (call $print_str (i32.const 1) (i32.const 0x135) (i32.const 3))))
+      (then (call $die (i32.const 0x200)))  ;; "not a wasm module"
+      (else (call $print_str (i32.const 1) (i32.const 0x108) (i32.const 3))))
     ;; parse and print id, size
     (local.set $end (i32.add (global.get $input_ptr) (global.get $input_len)))
     (global.set $pos (i32.add (global.get $input_ptr) (i32.const 8)))
@@ -437,12 +452,12 @@
         (local.set $id (call $read_u8))
         (local.set $size (call $read_u32))
         (if (i32.gt_u (local.get $id) (i32.const 12))
-          (then (call $print_err (i32.const 0x127) (i32.const 14))))
+          (then (call $die (i32.const 0x221))))  ;; "bad section id"
         (if (i32.gt_u (local.get $size) (i32.sub (local.get $end) (global.get $pos)))
-          (then (call $print_err (i32.const 0x119) (i32.const 14))))
-        (call $print_str (i32.const 1) (i32.const 0x138) (i32.const 8))
+          (then (call $die (i32.const 0x212))))  ;; "unexpected end"
+        (call $print_str (i32.const 1) (i32.const 0x10b) (i32.const 8))
         (call $print_u32 (i32.const 1) (local.get $id))
-        (call $print_str (i32.const 1) (i32.const 0x140) (i32.const 6))
+        (call $print_str (i32.const 1) (i32.const 0x113) (i32.const 6))
         (call $print_u32 (i32.const 1) (local.get $size))
         (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
         ;; decode the body or skip it
@@ -454,9 +469,9 @@
           (if (i32.eq (local.get $id) (i32.const 10)) (then (call $decode_code_section) (br $handled)))
           (if (i32.eqz (local.get $id))
             (then (global.set $pos (i32.add (global.get $pos) (local.get $size))) (br $handled)))
-          (call $print_err (i32.const 0x1a6) (i32.const 19)))
+          (call $die (i32.const 0x230)))  ;; "unsupported section"
         (if (i32.ne (global.get $pos) (i32.add (local.get $start) (local.get $size)))
-          (then (call $print_err (i32.const 0x17d) (i32.const 21))))
+          (then (call $die (i32.const 0x244))))  ;; "section size mismatch"
         (br $continue))))
 
   ;; run function funcidx on an empty value stack until it returns
@@ -470,12 +485,12 @@
     (call $decode_module)
     (call $print_tables)
     ;; look up `main` and print function index
-    (local.set $main (call $find_export (i32.const 0x1a2) (i32.const 4) (i32.const 0)))
+    (local.set $main (call $find_export (i32.const 0x129) (i32.const 4) (i32.const 0)))
     (if (i32.eq (local.get $main) (i32.const -1))
-      (then (call $print_err (i32.const 0x1f0) (i32.const 16))))
-    (call $print_str (i32.const 1) (i32.const 0x1a2) (i32.const 4))
-    (call $print_str (i32.const 1) (i32.const 0x199) (i32.const 4))
-    (call $print_str (i32.const 1) (i32.const 0x19d) (i32.const 5))
+      (then (call $die (i32.const 0x2cb))))  ;; "export not found"
+    (call $print_str (i32.const 1) (i32.const 0x129) (i32.const 4))
+    (call $print_str (i32.const 1) (i32.const 0x120) (i32.const 4))
+    (call $print_str (i32.const 1) (i32.const 0x124) (i32.const 5))
     (call $print_u32 (i32.const 1) (local.get $main))
     (call $print_str (i32.const 1) (i32.const 0x107) (i32.const 1))
     ;; run main and print the result it left on the value stack
