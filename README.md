@@ -16,5 +16,9 @@ brew install wabt wasmtime
 
 ```sh
 wat2wasm main.wat -o main.wasm
-wasmtime main.wasm
+wat2wasm examples/const42.wat -o const42.wasm
+wasmtime --dir=. main.wasm const42.wasm
 ```
+
+The input file is opened relative to the directory passed with `--dir`,
+so give a relative path.

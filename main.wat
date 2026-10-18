@@ -3,20 +3,30 @@
     (func $fd_write (param i32 i32 i32 i32) (result i32)))
   (import "wasi_snapshot_preview1" "proc_exit"
     (func $proc_exit (param i32)))
+  (import "wasi_snapshot_preview1" "args_sizes_get"
+    (func $args_sizes_get (param i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "args_get"
+    (func $args_get (param i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "path_open"
+    (func $path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_read"
+    (func $fd_read (param i32 i32 i32 i32) (result i32)))
 
-  (memory (export "memory") 1)
+  (memory (export "memory") 2)
 
   ;; Static memory layout
-  ;;   0x000   iovec for fd_write (ptr at 0x000, len at 0x004)
+  ;;   0x000   iovec for fd_write / fd_read (ptr at 0x000, len at 0x004)
   ;;   0x008   nwritten
   ;;   0x010   digit buffer for $print_u32 (0x010..0x019)
+  ;;   0x020   scratch for WASI calls: argc, argv_buf_size, opened fd, nread
   ;;   0x100   text constants, used with $print_str (ptr, len)
   ;;   0x200   error messages, NUL-terminated, used with $die (ptr)
-  ;;   0x400   input module
+  ;;   0x400   argv pointers followed by argv strings (0x400..0xfff)
   ;;   0x1000  type table: 256 entries (0x1000..0x1fff)
   ;;   0x2000  func table: 1024 entries (0x2000..0x5fff)
   ;;   0x6000  export table: 256 entries (0x6000..0x6fff)
   ;;   0x8000  value stack: 8-byte slots, grows up (0x8000..0xffff)
+  ;;   0x10000 input module, read from the file from argv[1] (0x10000..0x1ffff)
 
   (data (i32.const 0x100) "error: ")                ;; 7 bytes  (0x100..0x106)
   (data (i32.const 0x107) "\n")                     ;; 1 byte   (0x107)
@@ -52,13 +62,11 @@
   (data (i32.const 0x2cb) "export not found\00")       ;; 0x2cb..0x2db
   (data (i32.const 0x2dc) "stack overflow\00")         ;; 0x2dc..0x2ea
   (data (i32.const 0x2eb) "stack underflow\00")        ;; 0x2eb..0x2fa
-
-  (data (i32.const 0x400)
-    "\25\00\00\00" ;; length
-    ;; (module (func (export "main") (result i32) i32.const 42))
-    "\00\61\73\6d" "\01\00\00\00"
-    "\01\05\01\60\00\01\7f" "\03\02\01\00"
-    "\07\08\01\04main\00\00" "\0a\06\01\04\00\41\2a\0b")
+  (data (i32.const 0x2fb) "usage: watime <file.wasm>\00")  ;; 0x2fb..0x314
+  (data (i32.const 0x315) "cannot open file\00")       ;; 0x315..0x325
+  (data (i32.const 0x326) "cannot read file\00")       ;; 0x326..0x336
+  (data (i32.const 0x337) "input too large\00")        ;; 0x337..0x346
+  (data (i32.const 0x347) "args too long\00")          ;; 0x347..0x354
 
   (global $input_ptr (mut i32) (i32.const 0))
   (global $input_len (mut i32) (i32.const 0))
@@ -427,14 +435,49 @@
     (loop $next
       (br_if $next (i32.eqz (call_indirect (type $op) (call $read_u8))))))
 
-  ;; decode the embedded module
+  ;; read the file argv[1] into the input buffer at 0x10000
+  (func $read_input_file
+    (local $argc i32) (local $argv_buf i32) (local $path i32) (local $fd i32) (local $n i32)
+    (drop (call $args_sizes_get (i32.const 0x20) (i32.const 0x24)))
+    (local.set $argc (i32.load (i32.const 0x20)))
+    (if (i32.lt_u (local.get $argc) (i32.const 2))
+      (then (call $die (i32.const 0x2fb))))
+    (local.set $argv_buf (i32.add (i32.const 0x400) (i32.shl (local.get $argc) (i32.const 2))))
+    (if (i32.gt_u (i32.add (local.get $argv_buf) (i32.load (i32.const 0x24))) (i32.const 0x1000))
+      (then (call $die (i32.const 0x347))))
+    (drop (call $args_get (i32.const 0x400) (local.get $argv_buf)))
+    (local.set $path (i32.load (i32.const 0x404)))
+    (if (call $path_open
+          (i32.const 3)
+          (i32.const 0)
+          (local.get $path) (call $strlen (local.get $path))
+          (i32.const 0)
+          (i64.const 2)
+          (i64.const 0)
+          (i32.const 0)
+          (i32.const 0x28))
+      (then (call $die (i32.const 0x315))))
+    (local.set $fd (i32.load (i32.const 0x28)))
+    ;; read until EOF
+    (global.set $input_ptr (i32.const 0x10000))
+    (global.set $input_len (i32.const 0))
+    (loop $next
+      (if (i32.ge_u (global.get $input_len) (i32.const 0x10000))
+        (then (call $die (i32.const 0x337))))
+      (i32.store (i32.const 0) (i32.add (global.get $input_ptr) (global.get $input_len)))
+      (i32.store (i32.const 4) (i32.sub (i32.const 0x10000) (global.get $input_len)))
+      (if (call $fd_read (local.get $fd) (i32.const 0) (i32.const 1) (i32.const 0x2c))
+        (then (call $die (i32.const 0x326))))
+      (local.set $n (i32.load (i32.const 0x2c)))
+      (global.set $input_len (i32.add (global.get $input_len) (local.get $n)))
+      (br_if $next (local.get $n))))
+
+  ;; decode the input module
   (func $decode_module
     (local $end i32)
     (local $id i32)
     (local $size i32)
     (local $start i32)
-    (global.set $input_len (i32.load (i32.const 0x400)))
-    (global.set $input_ptr (i32.const 0x404))
     (if (i32.lt_u (global.get $input_len) (i32.const 8))
       (then (call $die (i32.const 0x212))))  ;; "unexpected end"
     ;; throw a error if header is not 0x6d736100, or version not 1
@@ -482,6 +525,7 @@
 
   (func (export "_start")
     (local $main i32)
+    (call $read_input_file)
     (call $decode_module)
     (call $print_tables)
     ;; look up `main` and print function index
